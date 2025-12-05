@@ -7,37 +7,28 @@ let triangles;
 
 // Mesh parameters
 let meshColor = [0, 255, 0]; // RGB color for mesh fill/stroke
-let lineWidth = 0.7; // stroke weight for triangles
-let dotSize = 4;       // size of vertex dots
+let lineWidth = 0.45; // base stroke weight
+let dotSize = 2.5;     // base dot size
 
 // Toggles
 let useBlackBackground = true; // background toggle ('b')
-let fillMesh = false;           // filled mesh toggle ('f')
-let hideLines = false;          // hide triangle lines toggle ('h')
+let fillMesh = false;          // filled mesh toggle ('f')
+let hideLines = false;         // hide triangle lines toggle ('h')
 
 function preload() {
-  // Load FaceMesh model 
   faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true });
 }
 
 function mousePressed() {
   console.log(faces);
-
-  // Toggle fullscreen
   let fs = fullscreen();
   fullscreen(!fs);
 }
 
 function keyPressed() {
-  if (key === 'b' || key === 'B') {
-    useBlackBackground = !useBlackBackground; // toggle background
-  }
-  if (key === 'f' || key === 'F') {
-    fillMesh = !fillMesh; // toggle mesh fill
-  }
-  if (key === 'h' || key === 'H') {
-    hideLines = !hideLines; // toggle hiding the connecting lines
-  }
+  if (key === 'b' || key === 'B') useBlackBackground = !useBlackBackground;
+  if (key === 'f' || key === 'F') fillMesh = !fillMesh;
+  if (key === 'h' || key === 'H') hideLines = !hideLines;
 }
 
 function gotFaces(results) {
@@ -45,36 +36,32 @@ function gotFaces(results) {
 }
 
 function setup() {
-  createCanvas(windowWidth, windowHeight); // full window canvas
+  createCanvas(windowWidth, windowHeight);
   video = createCapture(VIDEO, { flipped: true });
-  video.size(640, 480); // webcam native resolution
+  video.size(640, 480);
   video.hide();
-
-  // Start detecting faces
   faceMesh.detectStart(video, gotFaces);
-
-  // Get predefined triangle connections
   triangles = faceMesh.getTriangles();
 }
 
 function draw() {
   video.loadPixels();
 
-  // Calculate scaling to fit the window while preserving aspect ratio
   let scaleX = width / video.width;
   let scaleY = height / video.height;
-  let scaleFactor = max(scaleX, scaleY); // scale to cover full window without skewing
+  let scaleFactor = max(scaleX, scaleY);
+
   let videoWidth = video.width * scaleFactor;
   let videoHeight = video.height * scaleFactor;
   let offsetX = (width - videoWidth) / 2;
   let offsetY = (height - videoHeight) / 2;
 
-  // Draw background or scaled webcam
-  if (useBlackBackground) {
-    background(0);
-  } else {
-    image(video, offsetX, offsetY, videoWidth, videoHeight);
-  }
+  // NEW — dynamic scaling
+  let scaledLineWidth = lineWidth * scaleFactor;
+  let scaledDotSize = dotSize * scaleFactor;
+
+  if (useBlackBackground) background(0);
+  else image(video, offsetX, offsetY, videoWidth, videoHeight);
 
   if (faces.length > 0) {
     let face = faces[0];
@@ -83,13 +70,11 @@ function draw() {
     beginShape(TRIANGLES);
 
     for (let i = 0; i < triangles.length; i++) {
-      let tri = triangles[i];
-      let [a, b, c] = tri;
+      let [a, b, c] = triangles[i];
       let pointA = face.keypoints[a];
       let pointB = face.keypoints[b];
       let pointC = face.keypoints[c];
 
-      // Scale and offset keypoints to match resized video
       let ax = pointA.x * scaleFactor + offsetX;
       let ay = pointA.y * scaleFactor + offsetY;
       let bx = pointB.x * scaleFactor + offsetX;
@@ -97,11 +82,9 @@ function draw() {
       let cx = pointC.x * scaleFactor + offsetX;
       let cy = pointC.y * scaleFactor + offsetY;
 
-      // Calculate centroid for color sampling
       let centroidX = (ax + bx + cx) / 3;
       let centroidY = (ay + by + cy) / 3;
 
-      // Map centroid back to video pixels
       let px = floor((centroidX - offsetX) / scaleFactor);
       let py = floor((centroidY - offsetY) / scaleFactor);
       let index = (px + py * video.width) * 4;
@@ -110,20 +93,16 @@ function draw() {
       let gg = video.pixels[index + 1];
       let bb = video.pixels[index + 2];
 
-      // Decide stroke/fill behavior, respecting the new hideLines toggle
       if (fillMesh) {
-        // If fill is enabled we keep the fill and do not draw stroke
         noStroke();
         fill(meshColor[0], meshColor[1], meshColor[2]);
       } else {
-        // If fill is disabled, normally we draw stroked triangles.
-        // When hideLines is true we suppress stroke and also suppress fill so triangles don't show.
         if (hideLines) {
           noStroke();
           noFill();
         } else {
           stroke(meshColor[0], meshColor[1], meshColor[2]);
-          strokeWeight(lineWidth);
+          strokeWeight(scaledLineWidth); // ← UPDATED
           noFill();
         }
       }
@@ -135,7 +114,7 @@ function draw() {
 
     endShape();
 
-    // ---- Draw dots at triangle vertices (always visible) ----
+    // Draw dots (scaled)
     noStroke();
     fill(meshColor[0], meshColor[1], meshColor[2]);
 
@@ -152,9 +131,9 @@ function draw() {
       let cx = C.x * scaleFactor + offsetX;
       let cy = C.y * scaleFactor + offsetY;
 
-      circle(ax, ay, dotSize);
-      circle(bx, by, dotSize);
-      circle(cx, cy, dotSize);
+      circle(ax, ay, scaledDotSize); // ← UPDATED
+      circle(bx, by, scaledDotSize); // ← UPDATED
+      circle(cx, cy, scaledDotSize); // ← UPDATED
     }
   }
 }
